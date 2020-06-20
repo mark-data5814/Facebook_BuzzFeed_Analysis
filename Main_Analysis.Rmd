@@ -1,0 +1,237 @@
+---
+title: "STA 412 Group Project Step 3"
+author: "Mark, Tanu, Pete"
+date: "4/17/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Set working directory - change to your PCs project location
+setwd("C:/GitProjects/Facebook_BuzzFeed_Analysis")
+```
+
+# Facebook Data Project
+
+Our group has decided to research the topic of “Fake News” on Facebook and how much it is reacted to and shared on the social media site. We stumbled upon this dataset on Kaggle, and with the 2020 election approaching, we thought a topic like this would be both relevant and informative. We hope we can shed light on how false information can be spread through social media.
+
+Our dataset comes from Kaggle, and contains one csv file with over 2000 data points. The source of the data is from BuzzFeed News, who analyzed stories from hyperpartisan political Facebook pages. These pages contain right and left wing sources, and mainstream news sites, giving us a great mix of viewpoints. The dataset can be found at the following link: https://www.kaggle.com/mrisdal/fact-checking-facebook-politics-pages
+
+### Import Data and Data Processing
+
+```{r}
+# Read in Dataset - change to your PCs data location
+fb_data = read.csv("Data/facebook-fact-check.csv")
+
+# Drop unnecessary columns
+fb_data = as.data.frame(fb_data[,c(3,4,7,8,10,11,12)])
+
+# Omit NaNs
+fb_data = na.omit(fb_data)
+head(fb_data)
+
+# Display feature types and classes
+sapply(fb_data, mode)
+sapply(fb_data, class)
+
+# Fix levels of Rating variable for plots
+
+fb_data$Rating = factor(fb_data$Rating, levels = c("mostly true",
+                                                   "mixture of true and false",
+                                                   "mostly false",
+                                                   "no factual content"))
+```
+
+# Descriptive Statistics
+
+Histogram for share_count and reaction count
+
+```{r}
+attach(fb_data)
+par(mfrow=c(1,2))
+hist(share_count)
+hist(reaction_count)
+```
+
+Max, Min, Median values and Means for each rating for share_count
+
+```{r}
+# share_count max
+max(share_count)
+# share_count min
+min(share_count)
+# share_count median
+median(share_count)
+# share_count means for each rating
+aggregate(share_count~Rating,fb_data,mean)
+# share_count variances for each rating
+aggregate(share_count~Rating,fb_data,var)
+# share_count standard deviation for each rating
+aggregate(share_count~Rating,fb_data,sd)
+```
+
+Max, Min, Median values and Means for each rating for reaction_count
+
+```{r}
+# reaction_count max
+max(reaction_count)
+# reaction_count min
+min(reaction_count)
+# reaction_count median
+median(reaction_count)
+# reaction_count means for each rating
+aggregate(reaction_count~Rating,fb_data,mean)
+# reaction_count variances for each rating
+aggregate(reaction_count~Rating,fb_data,var)
+# reaction_count standard deviation for each rating
+aggregate(reaction_count~Rating,fb_data,sd)
+```
+
+Q-Q Plots for Normality
+
+```{r}
+par(mfrow=c(1,3))
+attach(fb_data)
+qqnorm(share_count)
+qqline(share_count)
+qqnorm(reaction_count)
+qqline(reaction_count)
+```
+
+Logarithmic Transformation
+
+```{r}
+fb_data$log_share_count= log(fb_data$share_count) 
+fb_data$log_reaction_count= log(fb_data$reaction_count)
+```
+
+New Q-Q Plots
+
+```{r}
+attach(fb_data)
+par(mfrow=c(1,2))
+qqnorm(log_share_count)
+qqline(log_share_count)
+qqnorm(log_reaction_count)
+qqline(log_reaction_count)
+```
+
+### Our First Hypothesis
+
+Facebook posts, regardless of what political viewpoint, are shared and reated to differently for each level of factual content. In other words, posts with at least one level of factual content have different mean values of shares and reactions.
+
+In order to test our first hypothesis, we will use a One-Way Analysis of Means. This will test whether the mean values of share_count and reaction_count are different for each individual rating.
+
+H0: mu1 = mu2 = mu3 = mu4  
+Ha: at least one muk is different  
+
+This test will show us if, on average, posts are shared, reacted to, and commented on more for each rating.
+
+##### Hypothesis 1: Test 1
+
+```{r}
+# One-Way Analysis of Means for share_count
+
+# Test Using Logarithmic Transformation
+oneway.test(log_share_count~Rating, fb_data, var.equal = F)
+```
+
+This one-way analysis of means gives significant evidence that there is at least one different mean value of share_count of a rating. This is significant to us because it concludes that at least one of the ratings are receiving more or less shares than the others.
+
+##### Hypothesis 1: Test 2
+
+```{r}
+# One-Way Analysis of Means for reaction_count
+
+# Test Using Logarithmic Transformation
+oneway.test(log_reaction_count~Rating, fb_data, var.equal = F)
+```
+
+This one-way analysis of means gives significant evidence that there is at least one different mean value of reaction_count of a rating. This is significant to us because it concludes that at least one of the ratings are receiving more or less reactions than the others.
+
+#### First Hypotheses Conclusion
+
+We have significant evidence to reject the null hypothesis in each test. This is great for our research, in that it concludes that based on the rating of the post, it may be shared or reacted to more or less than posts with other ratings. We still have yet to find out how a rating of false or true may influence these response variables, however we will address this in the next hypotheses.
+
+### Our Second Hypothesis
+
+For our second question, we want to see how the factual content rating levels affect the number of shares and reactions Facebook posts receive. So our main question is, can the factual content rating level of a Facebook post determine how many shares and reactions it receives? First, we will use the F Test for Nested Models to determine if a linear regression model that includes the Rating predictor is more significant than a linear regression model with no predictors. We will conduct this for both of our response variables. If the conclusion of that test is that the model with the Rating predictor is significant, then we will see how the individual ratings affect the count of shares and reactions.
+
+H0: Beta_1 = 0
+Ha: Beta_1 does not equal zero
+
+Our significance level (alpha) will be 0.05
+
+### Plots for Linear Relationships
+
+```{r}
+par(mfrow=c(1,2))
+plot(log_share_count~Rating, data=fb_data)
+plot(log_reaction_count~Rating, data=fb_data)
+```
+
+### F Test for Nested Models
+
+F Test for Nested Models -> share_count
+
+```{r}
+shares.lm = lm(log_share_count ~ Rating, data = fb_data)
+shares_full = shares.lm
+shares_reduced = lm(log_share_count ~ 1, data = fb_data)
+anova(shares_reduced, shares_full)
+```
+
+F Test for Nested Models -> reaction_count
+
+```{r}
+reactions.lm = lm(log_reaction_count ~ Rating, data = fb_data)
+reactions_full = reactions.lm
+reactions_reduced = lm(log_reaction_count ~ 1, data = fb_data)
+anova(reactions_reduced, reactions_full)
+```
+
+
+### Linear Regression
+
+```{r}
+# Summary of shares.lm
+summary(shares.lm)
+contrasts(fb_data$Rating)
+```
+
+```{r}
+# Plot shares.lm
+plot(fb_data$Rating, fb_data$log_share_count)
+abline(shares.lm)
+```
+
+```{r}
+# Summary of reactions.lm
+summary(reactions.lm)
+contrasts(fb_data$Rating)
+```
+
+```{r}
+# Plot reactions.lm
+plot(fb_data$Rating, fb_data$log_reaction_count)
+abline(reactions.lm)
+```
+
+### Confidence Intervals
+
+Confidence Intervals for share_count model
+
+```{r}
+# 95% CI for beta0 and beta1 
+confint(shares.lm) 
+```
+
+Confidence Interval for reaction_count model
+
+```{r}
+# 95% CI for beta0 and beta1 
+confint(reactions.lm)
+```
+
+
+
